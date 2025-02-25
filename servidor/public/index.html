@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Socket.IO Chat</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <link rel="stylesheet" href="./css/styles.css">
+  </head>
+  <body>
+
+    <!-- Formulario de identificación -->
+    <div id="loginForm">
+      <h2>Identificación</h2>
+      <input type="text" id="userName" placeholder="Nombre" required />
+      <input type="text" id="userStatus" placeholder="Estado" />
+      <select id="avatarSelect">
+        <option value="avatar1.png">Avatar 1</option>
+        <option value="avatar2.png">Avatar 2</option>
+        <option value="avatar3.png">Avatar 3</option>
+      </select>
+      <button id="loginButton">Entrar</button>
+    </div>
+
+    <!-- Contenedor de chat -->
+    <div id="chatContainer" style="display:none;">
+      <h1>Socket.IO Chat</h1>
+
+      <!-- Lista de usuarios conectados -->
+      <div id="userListContainer">
+        <h3>Usuarios Conectados:</h3>
+        <ul id="userList"></ul>
+      </div>
+
+      <!-- Sala de mensajes -->
+      <ul id="messages"></ul>
+
+      <!-- Entrada de mensaje -->
+      <input id="input" autocomplete="off" />
+      <button id="sendText">Enviar Mensaje</button>
+
+      <!-- Entrada de imagen -->
+      <input id="imageInput" autocomplete="off" />
+      <button id="sendImage">Enviar Imagen</button>
+    </div>
+
+    <script>
+      const socket = io();
+      let userName, userStatus, avatar;
+
+      // Iniciar sesión
+      document.getElementById("loginButton").addEventListener("click", () => {
+        userName = document.getElementById("userName").value;
+        userStatus = document.getElementById("userStatus").value;
+        avatar = document.getElementById("avatarSelect").value;
+
+        if (!userName) {
+          alert("Por favor, introduce tu nombre");
+          return;
+        }
+
+        // Emitir evento de nuevo usuario
+        socket.emit("newUser", { userName, userStatus, avatar });
+
+        // Mostrar chat y ocultar el formulario
+        document.getElementById("loginForm").style.display = "none";
+        document.getElementById("chatContainer").style.display = "block";
+      });
+
+      // Enviar mensaje de texto
+      let input = document.getElementById("input");
+      let sendText = document.getElementById("sendText");
+      sendText.addEventListener("click", () => {
+        let data = { nombre: userName, mensaje: input.value, tipo: "texto" };
+        socket.emit("mensaje", data);
+        input.value = "";
+      });
+
+      // Enviar imagen
+      let imageInput = document.getElementById("imageInput");
+      let sendImage = document.getElementById("sendImage");
+      sendImage.addEventListener("click", () => {
+        let data = { nombre: userName, mensaje: imageInput.value, tipo: "imagen" };
+        socket.emit("mensaje", data);
+        imageInput.value = "";
+      });
+
+      // Mostrar lista de usuarios conectados
+      socket.on('userList', (users) => {
+        const userList = document.getElementById('userList');
+        userList.innerHTML = ''; // Limpiar lista
+        users.forEach(user => {
+          let li = document.createElement('li');
+          li.innerHTML = `<img src="${user.avatar}" width="30" /> ${user.userName} - ${user.userStatus}`;
+          userList.appendChild(li);
+        });
+      });
+
+      // Mostrar mensajes de texto o imagen
+      socket.on("texto", (datos) => {
+        let item = document.createElement("li");
+        if (datos.tipo === "texto") {
+          item.innerHTML = `<strong>${datos.nombre}</strong>: ${datos.mensaje}`;
+        } else if (datos.tipo === "imagen") {
+          item.innerHTML = `<strong>${datos.nombre}:</strong> <br><img src="${datos.mensaje}" width="200">`;
+        }
+        document.getElementById("messages").appendChild(item);
+      });
+    </script>
+  </body>
+</html>
