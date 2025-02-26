@@ -174,7 +174,7 @@ socket.on("typing", (data) => {
     // Asegúrate de que no sea el usuario que está escribiendo
     if (data.isTyping && data.user !== username) {
         typingStatus.style.display = "block"; 
-        typingStatus.innerHTML = `${data.user.name} está escribiendo...`; 
+        typingStatus.innerHTML = `${data.username} está escribiendo...`; 
     } else {
         typingStatus.style.display = "none"; 
     }
