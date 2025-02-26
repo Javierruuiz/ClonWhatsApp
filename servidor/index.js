@@ -1,49 +1,82 @@
-const express = require('express');
-const { createServer } = require('http');
-const path = require('path');
+const express = require("express");
+const { createServer } = require("http");
+const path = require("path");
+const socketIo = require("socket.io");
+const cors = require("cors");
+
 const app = express();
-const port = 3000;
-const { Server } = require('socket.io');
-const serv = createServer(app);
-const io = new Server(serv);
+const server = createServer(app);
+const io = socketIo(server, { cors: { origin: "*" } });
 
-let users = [];  // Para almacenar la información de los usuarios
+app.use(cors());
+app.use(express.static(path.join(__dirname, 'public')));
 
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/index.html'));
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "/public/index.html"));
 });
 
-io.on('connection', (socket) => {
-  let userInfo = {};
+let users = {}; 
 
-  // Evento cuando un nuevo usuario se conecta
-  socket.on('newUser', (data) => {
-    userInfo = data;
-    users.push({ id: socket.id, ...data });
-    console.log(`${data.userName} se ha conectado`);
+// Manejo de conexión de socket
+io.on("connection", (socket) => {
+  console.log("Nuevo usuario conectado", socket.id);
 
-    // Notificar a los usuarios de la entrada
-    io.emit('texto', { nombre: 'Servidor', mensaje: `${data.userName} ha entrado al chat`, tipo: 'texto' });
-    io.emit('userList', users); // Enviar lista actualizada de usuarios
+  socket.on("register", (userData) => {
+    users[socket.id] = {
+      name: userData.name,
+      profilePicUrl: userData.profilePicUrl,
+      status: userData.status,
+    };
+
+    io.emit("updateUserList", Object.values(users)); 
+    io.emit("message", { system: true, text: `${userData.name} se ha unido al chat.` });
   });
 
-  // Evento cuando un usuario se desconecta
-  socket.on('disconnect', () => {
-    users = users.filter(user => user.id !== socket.id);
-    console.log('Un usuario se ha desconectado');
-    io.emit('userList', users); // Actualizar lista de usuarios
-    io.emit('texto', { nombre: 'Servidor', mensaje: `${userInfo.userName} ha salido del chat`, tipo: 'texto' });
+  // Recibir mensaje y enviarlo a todos
+  socket.on("sendMessage", (message) => {
+    if (users[socket.id]) {
+      io.emit("message", {
+        user: users[socket.id],
+        text: message.text
+      });
+    }
   });
 
-  // Evento para recibir y emitir mensajes
-  socket.on("mensaje", (datos) => {
-    io.emit("texto", datos);
-    console.log("Recibo mensaje con datos = " + datos);
+  // Recibir archivo y enviarlo a todos
+  socket.on("sendFile", (fileData) => {
+    if (users[socket.id]) {
+      io.emit("fileMessage", {
+        user: users[socket.id],
+        file: fileData.file,
+        name: fileData.name,
+        type: fileData.type
+      });
+    }
+  });
+
+  socket.on("typing", (isTyping) => {
+    if (users[socket.id]) {
+        socket.broadcast.emit("typing", {
+            user: users[socket.id].name,
+            isTyping: isTyping
+        });
+    }
+  });
+  
+
+
+
+  // Manejo de desconexión de un usuario
+  socket.on("disconnect", () => {
+    if (users[socket.id]) {
+      let disconnectedUser = users[socket.id];
+      delete users[socket.id];
+      io.emit("updateUserList", Object.values(users));
+      io.emit("message", { system: true, text: `${disconnectedUser.name} se ha desconectado.` }); 
+    }
   });
 });
 
-app.use(express.static(path.join(__dirname, '/public')));
-
-serv.listen(port, () => {
-  console.log(`Servidor escuchando en el puerto ${port}`);
+server.listen(3000, () => {
+  console.log("Servidor funcionando");
 });
